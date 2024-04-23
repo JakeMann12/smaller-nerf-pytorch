@@ -89,7 +89,7 @@ To resume training post-train:
 ```bash
 python train_nerf.py --config config/lego.yml --load-checkpoint path/to/checkpoint.ckpt --prune "coarse"
 ```
---prune arguments are either "fine", "coarse", or "both"
+--prune arguments are {fine, coarse, both}
 
 ### Optional: Cache rays from the dataset
 
@@ -120,12 +120,12 @@ A Colab notebook for the _full_ NeRF model (albeit on low-resolution data) can b
 
 Once you've trained your NeRF, it's time to use that to render the scene. Use the `eval_nerf.py` script to do that. For the `lego-lowres` example, this would be
 ```bash
-python eval_nerf.py --config pretrained/lego-lowres/config.yml --checkpoint pretrained/lego-lowres/checkpoint199999.ckpt --savedir cache/rendered/lego-lowres
+python eval_nerf.py --config pretrained/lego-lowres/config.yml --checkpoint pretrained/lego-lowres/checkpoint199999.ckpt --savedir results/lego-lowres nameoftrial
 ```
 
 You can create a `gif` out of the saved images, for instance, by using [Imagemagick](https://imagemagick.org/).
 ```bash
-python makegif.py cache/rendered/lego-lowres
+python makegif.py results/lego-lowres nameoftrial
 ```
 
 This should give you a gif like this.
