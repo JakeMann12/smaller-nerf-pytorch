@@ -87,7 +87,7 @@ python train_nerf.py --config config/lego.yml
 
 To resume training post-train:
 ```bash
-python train_nerf.py --config config/lego.yml --load-checkpoint path/to/checkpoint.ckpt --prune "coarse"
+python train_nerf.py --config config/lego.yml --load-checkpoint path/to/checkpoint.ckpt --prune coarse
 ```
 --prune arguments are {fine, coarse, both}
 
@@ -123,7 +123,7 @@ Once you've trained your NeRF, it's time to use that to render the scene. Use th
 python eval_nerf.py --config pretrained/lego-lowres/config.yml --checkpoint pretrained/lego-lowres/checkpoint199999.ckpt --savedir results/lego-lowres nameoftrial
 ```
 
-You can create a `gif` out of the saved images, for instance, by using [Imagemagick](https://imagemagick.org/).
+You can create a `gif` out of the saved images by using:
 ```bash
 python makegif.py results/lego-lowres nameoftrial
 ```

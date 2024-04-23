@@ -7,11 +7,11 @@ experiment:
   # Seed for random number generators (for repeatability).
   randomseed: 42  # Cause, why not?
   # Number of training iterations.
-  train_iters: 375000
+  train_iters: 375010
   # Number of training iterations after which to validate.
   validate_every: 500
   # Number of training iterations after which to checkpoint.
-  save_every: 15000
+  save_every: 20000
   # Number of training iterations after which to print progress.
   print_every: 2000
 

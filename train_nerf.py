@@ -1,6 +1,7 @@
 import argparse
 import glob
 import os
+import shutil
 import time
 
 import numpy as np
@@ -16,18 +17,7 @@ import torch.nn.functional as F
 
 from nerf import (CfgNode, get_embedding_function, get_ray_bundle, img2mse,
                   load_blender_data, load_llff_data, meshgrid_xy, models,
-                  mse2psnr, run_one_iter_of_nerf)
-
-def clean_pruned_state_dict(state_dict):
-    """ Function to clean the state dictionary of pruned models to continue pruning. """
-    new_state_dict = {}
-    for key, value in state_dict.items():
-        if "_orig" in key:
-            # Restore the original weight name by removing '_orig'
-            new_key = key.replace("_orig", "")
-            new_state_dict[new_key] = value
-    return new_state_dict
-
+                  mse2psnr, run_one_iter_of_nerf, load_pruned_state_dict)
 
 def main():
 
@@ -184,17 +174,19 @@ def main():
     with open(os.path.join(logdir, "config.yml"), "w") as f:
         f.write(cfg.dump())  # cfg, f, default_flow_style=False)
 
-    # By default, start at iteration 0 (unless a checkpoint is specified).
-    start_iter = 0
-
-    # Load an existing checkpoint, if a path is specified.
     if os.path.exists(configargs.load_checkpoint):
         checkpoint = torch.load(configargs.load_checkpoint)
-        model_coarse.load_state_dict(checkpoint["model_coarse_state_dict"])
-        if checkpoint["model_fine_state_dict"]:
-            model_fine.load_state_dict(checkpoint["model_fine_state_dict"])
-        optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-        start_iter = checkpoint["iter"]
+        postcoarse = None; postfine = None
+        # Load state dictionaries with support for both pruned and unpruned models
+        if "model_coarse_state_dict" in checkpoint:
+            load_pruned_state_dict(model_coarse, checkpoint["model_coarse_state_dict"])
+            #postcoarse = 'coarse' #for end-of code data consolidation
+        if model_fine and "model_fine_state_dict" in checkpoint:
+            load_pruned_state_dict(model_fine, checkpoint["model_fine_state_dict"])
+            #postfine = 'fine'
+        if "optimizer_state_dict" in checkpoint:
+            optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+        start_iter = checkpoint.get("iter", 0)
         print(f"Success loading {configargs.load_checkpoint}")
     else:
         print(f"{configargs.load_checkpoint} doesn't exist! Wrong path perhaps?")
@@ -486,6 +478,21 @@ def main():
             )
             tqdm.write("================== Saved Checkpoint =================")
 
+    print("consolidating files")
+    #start iter, cfg.experiment.train_iters
+    # {postcoarse}{postfine}
+    get_prune_type = lambda path: path.split('/')[2].split()[0] if len(path.split('/')) >= 3 else None
+    exp_name = f"Post {get_prune_type(str(configargs.load_checkpoint))} Pruning {str(start_iter)[:3]}-{str(cfg.experiment.train_iters)[:3]}k"
+    new_folder_path = os.path.join(logdir, exp_name)
+    os.makedirs(new_folder_path, exist_ok=True)
+
+    # Iterate through all items in the original folder
+    for item in os.listdir(logdir):
+        item_path = os.path.join(logdir, item)
+        # Check if the item is a file (not a folder)
+        if os.path.isfile(item_path):
+            # Move the file to the new folder
+            shutil.move(item_path, new_folder_path)
     print("Done!")
 
 

@@ -300,6 +300,23 @@ def sample_pdf_2(bins, weights, num_samples, det=False):
 
     return samples
 
+def load_pruned_state_dict(model, state_dict):
+    new_state_dict = {}
+    for key, value in state_dict.items():
+        if '_orig' in key:
+            # Handle pruned weights
+            mask_key = key.replace('_orig', '_mask')
+            if mask_key in state_dict:
+                pruned_weights = state_dict[key] * state_dict[mask_key]
+                new_key = key.replace('_orig', '')
+                new_state_dict[new_key] = pruned_weights
+        elif '_mask' not in key:
+            # This handles unpruned weights or any other entries normally
+            new_state_dict[key] = value
+    model.load_state_dict(new_state_dict)
+    model.eval()  # Set model to evaluation mode after loading
+
+
 
 if __name__ == "__main__":
 

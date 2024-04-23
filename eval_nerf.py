@@ -17,6 +17,7 @@ from nerf import (
     models,
     get_embedding_function,
     run_one_iter_of_nerf,
+    load_pruned_state_dict
 )
 
 
@@ -29,23 +30,23 @@ def cast_to_image(tensor, dataset_type):
     # # Map back to shape (3, H, W), as tensorboard needs channels first.
     # return np.moveaxis(img, [-1], [0])
 
-def load_pruned_state_dict(model, state_dict):
-    # Create a new state dictionary for loading
-    new_state_dict = {}
-    for key in list(state_dict.keys()):
-        if '_orig' in key:
-            # Find the corresponding mask key
-            mask_key = key.replace('_orig', '_mask')
-            # Apply the mask to the original weights
-            pruned_weights = state_dict[key] * state_dict[mask_key]
-            # Prepare the new key by removing '_orig' and update the new state dict
-            new_key = key.replace('_orig', '')
-            new_state_dict[new_key] = pruned_weights
-        elif '_mask' not in key:  # Ensure that masked keys without _orig are not added
-            new_state_dict[key] = state_dict[key]
-    # Load the updated state dict into the model
-    model.load_state_dict(new_state_dict)
-    model.eval()  # Set model to evaluation mode after loading
+# def load_pruned_state_dict(model, state_dict):
+#     # Create a new state dictionary for loading
+#     new_state_dict = {}
+#     for key in list(state_dict.keys()):
+#         if '_orig' in key:
+#             # Find the corresponding mask key
+#             mask_key = key.replace('_orig', '_mask')
+#             # Apply the mask to the original weights
+#             pruned_weights = state_dict[key] * state_dict[mask_key]
+#             # Prepare the new key by removing '_orig' and update the new state dict
+#             new_key = key.replace('_orig', '')
+#             new_state_dict[new_key] = pruned_weights
+#         elif '_mask' not in key:  # Ensure that masked keys without _orig are not added
+#             new_state_dict[key] = state_dict[key]
+#     # Load the updated state dict into the model
+#     model.load_state_dict(new_state_dict)
+#     model.eval()  # Set model to evaluation mode after loading
 
 
 def cast_to_disparity_image(tensor):
