@@ -12,8 +12,8 @@ experiment:
   logdir: logs
   print_every: 2000
   randomseed: 42
-  save_every: 20000
-  train_iters: 255000
+  save_every: 1000
+  train_iters: 1000
   validate_every: 500
 models:
   coarse:
@@ -22,7 +22,7 @@ models:
     include_input_xyz: true
     log_sampling_dir: true
     log_sampling_xyz: true
-    n_bits: 16
+    n_bits: 32
     num_encoding_fn_dir: 4
     num_encoding_fn_xyz: 10
     num_layers: 8

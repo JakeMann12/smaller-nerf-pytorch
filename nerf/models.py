@@ -58,12 +58,15 @@ class FP_Linear(nn.Module):
         self.symmetric = symmetric
         
         # Initailization
-        m = self.in_features
-        n = self.out_features
-        self.linear.weight.data.normal_(0, math.sqrt(2. / (m+n)))
+        #m = self.in_features #commented for now
+        #n = self.out_features
+        #self.linear.weight.data.normal_(0, math.sqrt(2. / (m+n)))
 
     def forward(self, x):
-        return F.linear(x, STE.apply(self.linear.weight, self.Nbits, self.symmetric), self.linear.bias)
+        #print("Layer Name:", self.__class__.__name__)
+
+        fin = F.linear(x, STE.apply(self.linear.weight, self.Nbits, self.symmetric), self.linear.bias)
+        return fin
 
 class VeryTinyNeRFModel(torch.nn.Module):
     r"""Define a "very tiny" NeRF model comprising three fully connected layers.
@@ -275,12 +278,12 @@ class FlexibleNeRFModel(torch.nn.Module):
         for i in range(num_layers - 1):
             if i % self.skip_connect_every == 0 and i > 0 and i != num_layers - 1:
                 self.layers_xyz.append(
-                    torch.nn.Linear(self.dim_xyz + hidden_size, hidden_size)
-                    #FP_Linear(self.dim_xyz + hidden_size, hidden_size, Nbits, symmetric)
+                    #torch.nn.Linear(self.dim_xyz + hidden_size, hidden_size)
+                    FP_Linear(self.dim_xyz + hidden_size, hidden_size, Nbits, symmetric)
                 )
             else:
-                self.layers_xyz.append(torch.nn.Linear(hidden_size, hidden_size))
-                #self.layers_xyz.append(FP_Linear(hidden_size, hidden_size, Nbits, symmetric))
+                #self.layers_xyz.append(torch.nn.Linear(hidden_size, hidden_size))
+                self.layers_xyz.append(FP_Linear(hidden_size, hidden_size, Nbits, symmetric))
 
         self.use_viewdirs = use_viewdirs
         if self.use_viewdirs:

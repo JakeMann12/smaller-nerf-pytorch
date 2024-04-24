@@ -300,39 +300,112 @@ def sample_pdf_2(bins, weights, num_samples, det=False):
 
     return samples
 
+
 def load_pruned_state_dict(model, state_dict):
     new_state_dict = {}
     for key, value in state_dict.items():
-        new_key = key  # Start with assuming no change to key
-
-        # Handle pruned weights
         if '_orig' in key:
+            # Handle pruned weights
             mask_key = key.replace('_orig', '_mask')
             if mask_key in state_dict:
                 pruned_weights = state_dict[key] * state_dict[mask_key]
                 new_key = key.replace('_orig', '')
+                new_state_dict[new_key] = pruned_weights
+        elif '_mask' not in key:
+            # This handles unpruned weights or any other entries normally
+            new_state_dict[key] = value
+    model.load_state_dict(new_state_dict)
+    model.eval()  # Set model to evaluation mode after loading
 
-        # Adjust keys for layers that are expected to contain 'linear'
-        # This specifically checks for layer names in the xyz layers
-        layer_indicators = ["layers_xyz.", "layer1.", "layers_dir.", "fc_"]
-        if any(indicator in new_key for indicator in layer_indicators):
-            # Check if 'linear' needs to be added
-            if 'linear' not in new_key:
-                parts = new_key.split('.')
-                # Insert 'linear' before the last part (weight or bias)
-                parts.insert(-1, 'linear')
-                new_key = '.'.join(parts)
 
-        # Assign the possibly adjusted weights or the original ones
-        new_state_dict[new_key] = value if '_orig' not in key else pruned_weights
+# def load_pruned_state_dict(model, state_dict):
+#     new_state_dict = {}
+#     keys = []
+#     print(f"OG STATE DICT:\n {list(state_dict.keys())}")
+#     try:
+#         model.load_state_dict(model, state_dict)
+#         model.eval()
+#     except:
+    
+#         for key, value in state_dict.items():
+#             # Store the original key for debugging
+#             keys.append(key)
+#             try:
+#                 # Handle pruned weights
+#                 if '_orig' in key:
+#                     mask_key = key.replace('_orig', '_mask')
+#                     if mask_key in state_dict:
+#                         pruned_weights = state_dict[key] * state_dict[mask_key]
+#                         new_key = key.replace('_orig', '')  # Remove '_orig' from the key
+#                 else:
+#                     pruned_weights = value
+#                     new_key = key  # Keep the original key if it's not a pruned weight
+#                 # Assign the possibly adjusted weights or the original ones
+#                 new_state_dict[new_key] = pruned_weights if '_orig' in key else value
+#                 model.load_state_dict(new_state_dict)
+#                 model.eval()  # Set model to evaluation mode after loading      
 
-    # Attempt to load the modified state dictionary into the model
-    try:
-        model.load_state_dict(new_state_dict, strict=False)  # Use strict=False to ignore non-matching keys
-        model.eval()  # Set model to evaluation mode after loading
-        print("Model loaded successfully with adjusted keys.")
-    except RuntimeError as e:
-        print(f"Failed to load model: {e}")
+
+#             except:
+#                 print("TRYING EXCEPT CLAUSE")
+#                 # Handle pruned weights
+#                 if '_orig' in key:
+#                     mask_key = key.replace('_orig', '_mask')
+#                     if mask_key in state_dict:
+#                         pruned_weights = state_dict[key] * state_dict[mask_key]
+#                         new_key = key.replace('_orig', '')  # Remove '_orig' from the key
+#                 else:
+#                     pruned_weights = value
+#                     new_key = key  # Keep the original key if it's not a pruned weight
+#                 # QUANT: Insert 'linear' before the last part of the key if it doesn't already include 'linear'
+#                 if 'linear' not in new_key:
+#                     parts = new_key.split('.')
+#                     parts.insert(-1, 'linear')
+#                     new_key = '.'.join(parts)
+#                 # Assign the possibly adjusted weights or the original ones
+#                 new_state_dict[new_key] = pruned_weights if '_orig' in key else value
+#                 print(f"OLD KEYS: \n{keys}")
+#                 print(f"NEW KEYS: \n{list(new_state_dict.keys())}")
+#                 model.load_state_dict(new_state_dict)
+#                 model.eval()  # Set model to evaluation mode after loading      
+
+    
+    
+
+
+# def load_pruned_state_dict(model, state_dict):
+#     new_state_dict = {}
+#     for key, value in state_dict.items():
+#         new_key = key  # Start with assuming no change to key
+
+#         # Handle pruned weights
+#         if '_orig' in key:
+#             mask_key = key.replace('_orig', '_mask')
+#             if mask_key in state_dict:
+#                 pruned_weights = state_dict[key] * state_dict[mask_key]
+#                 new_key = key.replace('_orig', '')
+
+#         # Adjust keys for layers that are expected to contain 'linear'
+#         # This specifically checks for layer names in the xyz layers
+#         layer_indicators = ["layers_xyz.", "layer1.", "layers_dir.", "fc_"]
+#         if any(indicator in new_key for indicator in layer_indicators):
+#             # Check if 'linear' needs to be added
+#             if 'linear' not in new_key:
+#                 parts = new_key.split('.')
+#                 # Insert 'linear' before the last part (weight or bias)
+#                 parts.insert(-1, 'linear')
+#                 new_key = '.'.join(parts)
+
+#         # Assign the possibly adjusted weights or the original ones
+#         new_state_dict[new_key] = value if '_orig' not in key else pruned_weights
+
+#     # Attempt to load the modified state dictionary into the model
+#     try:
+#         model.load_state_dict(new_state_dict, strict=False)  # Use strict=False to ignore non-matching keys
+#         model.eval()  # Set model to evaluation mode after loading
+#         print("Model loaded successfully with adjusted keys.")
+#     except RuntimeError as e:
+#         print(f"Failed to load model: {e}")
 
 
 

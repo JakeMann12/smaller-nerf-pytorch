@@ -30,6 +30,7 @@ def cast_to_image(tensor, dataset_type):
     # # Map back to shape (3, H, W), as tensorboard needs channels first.
     # return np.moveaxis(img, [-1], [0])
 
+
 def cast_to_disparity_image(tensor):
     img = (tensor - tensor.min()) / (tensor.max() - tensor.min())
     img = img.clamp(0, 1) * 255
@@ -110,12 +111,13 @@ def main():
         include_input_xyz=cfg.models.coarse.include_input_xyz,
         include_input_dir=cfg.models.coarse.include_input_dir,
         use_viewdirs=cfg.models.coarse.use_viewdirs,
-        Nbits = cfg.models.coarse.n_bits if type(cfg.models.coarse.n_bits) == int else None,
+         Nbits = cfg.models.coarse.n_bits if type(cfg.models.coarse.n_bits) == int else None,
         symmetric = cfg.models.coarse.symmetricquant
+    
     )
     model_coarse.to(device)
 
-    # Initialize the fine-resolution model if specified
+    # If a fine-resolution model is specified, initialize it.
     model_fine = None
     if hasattr(cfg.models, "fine"):
         model_fine = getattr(models, cfg.models.fine.type)(
@@ -124,17 +126,16 @@ def main():
             include_input_xyz=cfg.models.fine.include_input_xyz,
             include_input_dir=cfg.models.fine.include_input_dir,
             use_viewdirs=cfg.models.fine.use_viewdirs,
-            Nbits = None, #cfg.models.fine.n_bits if type(cfg.models.fine.n_bits) == int else None,
+             Nbits = cfg.models.fine.n_bits if type(cfg.models.coarse.n_bits) == int else None,
             symmetric = cfg.models.fine.symmetricquant
-        )
+            )
         model_fine.to(device)
-
-    model_coarse.eval()
-    if model_fine:
-        model_coarse.eval()
 
     # Load the checkpoint
     checkpoint = torch.load(configargs.checkpoint, map_location=device)
+    print("Checkpoint keys:")
+    for key in checkpoint["model_coarse_state_dict"].keys():
+        print(key)
 
     # Apply the function to load pruned state dicts
     if "model_coarse_state_dict" in checkpoint:
@@ -146,13 +147,16 @@ def main():
         except Exception as e:
             print(f"Error loading fine model: {str(e)}")
 
-    # Load other relevant parameters if present
-    if "height" in checkpoint:
+    if "height" in checkpoint.keys():
         hwf[0] = checkpoint["height"]
-    if "width" in checkpoint:
+    if "width" in checkpoint.keys():
         hwf[1] = checkpoint["width"]
-    if "focal_length" in checkpoint:
+    if "focal_length" in checkpoint.keys():
         hwf[2] = checkpoint["focal_length"]
+
+    model_coarse.eval()
+    if model_fine:
+        model_fine.eval()
 
     render_poses = render_poses.float().to(device)
 
