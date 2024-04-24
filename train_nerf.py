@@ -144,6 +144,8 @@ def main():
         include_input_xyz=cfg.models.coarse.include_input_xyz,
         include_input_dir=cfg.models.coarse.include_input_dir,
         use_viewdirs=cfg.models.coarse.use_viewdirs,
+        Nbits = cfg.models.coarse.n_bits if type(cfg.models.coarse.n_bits) == int else None,
+        symmetric = cfg.models.coarse.symmetricquant
     )
     model_coarse.to(device)
     # If a fine-resolution model is specified, initialize it.
@@ -155,6 +157,8 @@ def main():
             include_input_xyz=cfg.models.fine.include_input_xyz,
             include_input_dir=cfg.models.fine.include_input_dir,
             use_viewdirs=cfg.models.fine.use_viewdirs,
+            Nbits = None, #cfg.models.fine.n_bits if type(cfg.models.fine.n_bits) == int else None,
+            symmetric = cfg.models.fine.symmetricquant
         )
         model_fine.to(device)
 
@@ -204,7 +208,6 @@ def main():
 
         #%% TRAINING
         if configargs.prune is not None: 
-            #print('\n\n\n\n\n\nPRUNING')
             # Determine the current fraction of completed training
             total_iters = cfg.experiment.train_iters - start_iter
             current_progress = (i - start_iter) / total_iters
@@ -222,32 +225,17 @@ def main():
             if current_progress in pruning_intervals:
                 if configargs.prune == "coarse" or configargs.prune == "both":
                     for name, module in model_coarse.named_modules():
-                        if isinstance(module, (torch.nn.Conv2d, torch.nn.Linear)) and name not in excluded_layers:
+                        if isinstance(module, (torch.nn.Linear)) and name not in excluded_layers:
                             prune.ln_structured(module, name='weight', amount=current_prune_level, n=1, dim=0)
-
-                            # Log the pruned weights
-                            for param_tensor in module.named_parameters():
-                                param_name, param_value = param_tensor
-                                if 'weight' in param_name:  # Ensure only weights are logged
-                                    writer.add_histogram(f"{name}/{param_name}", param_value, i)
-                                    writer.flush()
-                                
                             print(f'Pruned coarse {name} to {current_prune_level * 100:.2f}% at {current_progress * 100:.1f}% of training')
 
                 # Pruning the fine model
                 if configargs.prune == "fine" or configargs.prune == "both":  # Check if there is a fine model defined
                     for name, module in model_fine.named_modules():
-                        if isinstance(module, (torch.nn.Conv2d, torch.nn.Linear)) and name not in excluded_layers:
+                        if isinstance(module, (torch.nn.Linear)) and name not in excluded_layers:
                             prune.ln_structured(module, name='weight', amount=current_prune_level, n=1, dim=0)
-                            
-                            # Log the pruned weights
-                            for param_tensor in module.named_parameters():
-                                param_name, param_value = param_tensor
-                                if 'weight' in param_name:  # Ensure only weights are logged
-                                    writer.add_histogram(f"{name}/{param_name}", param_value, i)
-                                    writer.flush()
                             print(f'Pruned fine {name} to {current_prune_level * 100:.2f}% at {current_progress * 100:.1f}% of training')
- 
+
 
         if USE_CACHED_DATASET:
             #print("USING CACHED DATASET")
@@ -438,7 +426,7 @@ def main():
                 psnr = mse2psnr(loss.item())
                 writer.add_scalar("validation/loss", loss.item(), i)
                 writer.add_scalar("validation/coarse_loss", coarse_loss.item(), i)
-                writer.add_scalar("validataion/psnr", psnr, i)
+                writer.add_scalar("validation/psnr", psnr, i)
                 writer.add_image(
                     "validation/rgb_coarse", cast_to_image(rgb_coarse[..., :3]), i
                 )
@@ -477,6 +465,20 @@ def main():
                 os.path.join(logdir, pruneaddon + "checkpoint" + str(i).zfill(5) + ".ckpt"),
             )
             tqdm.write("================== Saved Checkpoint =================")
+            # Log the weights regardless of pruning
+            for name, module in model_coarse.named_modules():
+                if isinstance(module, (torch.nn.Linear)) and name not in excluded_layers:
+                    for param_name, param_value in module.named_parameters():
+                        if 'weight' in param_name:  # Ensure only weights are logged
+                            writer.add_histogram(f"{name}/{param_name}", param_value, i)
+                            writer.flush()
+
+            for name, module in model_fine.named_modules():
+                if isinstance(module, (torch.nn.Linear)) and name not in excluded_layers:
+                    for param_name, param_value in module.named_parameters():
+                        if 'weight' in param_name:  # Ensure only weights are logged
+                            writer.add_histogram(f"{name}/{param_name}", param_value, i)
+                            writer.flush()
 
     print("consolidating files")
     #start iter, cfg.experiment.train_iters

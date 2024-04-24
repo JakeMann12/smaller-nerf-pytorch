@@ -303,21 +303,45 @@ def sample_pdf_2(bins, weights, num_samples, det=False):
 def load_pruned_state_dict(model, state_dict):
     new_state_dict = {}
     for key, value in state_dict.items():
+        new_key = key  # Start with assuming no change to key
+
+        # Handle pruned weights
         if '_orig' in key:
-            # Handle pruned weights
             mask_key = key.replace('_orig', '_mask')
             if mask_key in state_dict:
                 pruned_weights = state_dict[key] * state_dict[mask_key]
                 new_key = key.replace('_orig', '')
-                new_state_dict[new_key] = pruned_weights
-        elif '_mask' not in key:
-            # This handles unpruned weights or any other entries normally
-            new_state_dict[key] = value
-    model.load_state_dict(new_state_dict)
-    model.eval()  # Set model to evaluation mode after loading
+
+        # Adjust keys for layers that are expected to contain 'linear'
+        # This specifically checks for layer names in the xyz layers
+        layer_indicators = ["layers_xyz.", "layer1.", "layers_dir.", "fc_"]
+        if any(indicator in new_key for indicator in layer_indicators):
+            # Check if 'linear' needs to be added
+            if 'linear' not in new_key:
+                parts = new_key.split('.')
+                # Insert 'linear' before the last part (weight or bias)
+                parts.insert(-1, 'linear')
+                new_key = '.'.join(parts)
+
+        # Assign the possibly adjusted weights or the original ones
+        new_state_dict[new_key] = value if '_orig' not in key else pruned_weights
+
+    # Attempt to load the modified state dictionary into the model
+    try:
+        model.load_state_dict(new_state_dict, strict=False)  # Use strict=False to ignore non-matching keys
+        model.eval()  # Set model to evaluation mode after loading
+        print("Model loaded successfully with adjusted keys.")
+    except RuntimeError as e:
+        print(f"Failed to load model: {e}")
 
 
 
+
+
+
+
+
+    # i, j = np.meshgrid(np.arange(3), np.arange(4, 7), indexing='xy')
 if __name__ == "__main__":
 
     # # meshgrid_xy

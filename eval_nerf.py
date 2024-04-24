@@ -30,25 +30,6 @@ def cast_to_image(tensor, dataset_type):
     # # Map back to shape (3, H, W), as tensorboard needs channels first.
     # return np.moveaxis(img, [-1], [0])
 
-# def load_pruned_state_dict(model, state_dict):
-#     # Create a new state dictionary for loading
-#     new_state_dict = {}
-#     for key in list(state_dict.keys()):
-#         if '_orig' in key:
-#             # Find the corresponding mask key
-#             mask_key = key.replace('_orig', '_mask')
-#             # Apply the mask to the original weights
-#             pruned_weights = state_dict[key] * state_dict[mask_key]
-#             # Prepare the new key by removing '_orig' and update the new state dict
-#             new_key = key.replace('_orig', '')
-#             new_state_dict[new_key] = pruned_weights
-#         elif '_mask' not in key:  # Ensure that masked keys without _orig are not added
-#             new_state_dict[key] = state_dict[key]
-#     # Load the updated state dict into the model
-#     model.load_state_dict(new_state_dict)
-#     model.eval()  # Set model to evaluation mode after loading
-
-
 def cast_to_disparity_image(tensor):
     img = (tensor - tensor.min()) / (tensor.max() - tensor.min())
     img = img.clamp(0, 1) * 255
@@ -129,6 +110,8 @@ def main():
         include_input_xyz=cfg.models.coarse.include_input_xyz,
         include_input_dir=cfg.models.coarse.include_input_dir,
         use_viewdirs=cfg.models.coarse.use_viewdirs,
+        Nbits = cfg.models.coarse.n_bits if type(cfg.models.coarse.n_bits) == int else None,
+        symmetric = cfg.models.coarse.symmetricquant
     )
     model_coarse.to(device)
 
@@ -141,8 +124,14 @@ def main():
             include_input_xyz=cfg.models.fine.include_input_xyz,
             include_input_dir=cfg.models.fine.include_input_dir,
             use_viewdirs=cfg.models.fine.use_viewdirs,
+            Nbits = None, #cfg.models.fine.n_bits if type(cfg.models.fine.n_bits) == int else None,
+            symmetric = cfg.models.fine.symmetricquant
         )
         model_fine.to(device)
+
+    model_coarse.eval()
+    if model_fine:
+        model_coarse.eval()
 
     # Load the checkpoint
     checkpoint = torch.load(configargs.checkpoint, map_location=device)
