@@ -250,12 +250,12 @@ class FlexibleNeRFModel(torch.nn.Module):
         for i in range(num_layers - 1):
             if i % self.skip_connect_every == 0 and i > 0 and i != num_layers - 1:
                 self.layers_xyz.append(
-                    #torch.nn.Linear(self.dim_xyz + hidden_size, hidden_size)
-                    FP_Linear(self.dim_xyz + hidden_size, hidden_size, Nbits, symmetric)
+                    torch.nn.Linear(self.dim_xyz + hidden_size, hidden_size)
+                    #FP_Linear(self.dim_xyz + hidden_size, hidden_size, Nbits, symmetric)
                 )
             else:
-                #self.layers_xyz.append(torch.nn.Linear(hidden_size, hidden_size))
-                self.layers_xyz.append(FP_Linear(hidden_size, hidden_size, Nbits, symmetric))
+                self.layers_xyz.append(torch.nn.Linear(hidden_size, hidden_size))
+               # self.layers_xyz.append(FP_Linear(hidden_size, hidden_size, Nbits, symmetric))
 
         self.use_viewdirs = use_viewdirs
         if self.use_viewdirs:

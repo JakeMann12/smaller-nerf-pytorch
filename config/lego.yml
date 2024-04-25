@@ -71,7 +71,7 @@ models:
     # of the direction.
     log_sampling_dir: True
     #QUANTIZATION
-    n_bits: 2
+    n_bits: None
     symmetricquant: False
 
   # Fine model.
@@ -106,7 +106,7 @@ models:
     # of the direction.
     log_sampling_dir: True
     #QUANTIZATION
-    n_bits: 2
+    n_bits: None
     symmetricquant: False
 
 # Optimizer params.
@@ -174,11 +174,11 @@ nerf:
 pruning:
     # The maximum fraction of units to be pruned by the end of the training.
     # This value should be between 0 and 1, where 1 means 100% of the units are pruned.
-    max_prune_amount: 0.25
+    max_prune_amount: 0.1
 
     # The amount by which the pruning fraction is increased at each interval.
     # This incremental approach allows the network to gradually adjust to reduced complexity.
-    prune_increment: 0.05
+    prune_increment: 0.01
 
     # List of layer names to exclude from pruning.
     # Use this to protect critical layers whose performance impact from pruning might be detrimental.

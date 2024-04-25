@@ -207,6 +207,8 @@ def main():
         
 
     # # TODO: Prepare raybatch tensor if batching random rays
+    times_to_prune = 10; pruning_intervals = list(np.linspace(.05,.5,times_to_prune))
+    print(f"\n{times_to_prune}, \n{pruning_intervals}")
 
     for i in trange(start_iter, cfg.experiment.train_iters):
         model_coarse.train()
@@ -222,7 +224,7 @@ def main():
             total_iters = cfg.experiment.train_iters - start_iter
             current_progress = (i - start_iter) / total_iters
 
-            print(f"\n{times_to_prune}, \n{pruning_intervals}")
+            
 
             # Find the appropriate pruning amount based on the current training progress
             current_prune_level = 0
@@ -479,17 +481,15 @@ def main():
             tqdm.write("================== Saved Checkpoint =================")
             # Log the weights regardless of pruning
             for name, module in model_coarse.named_modules():
-                if isinstance(module, (torch.nn.Linear)) and name not in excluded_layers:
                     for param_name, param_value in module.named_parameters():
                         if 'weight' in param_name:  # Ensure only weights are logged
-                            writer.add_histogram(f"{name}/{param_name}", param_value, i)
+                            writer.add_histogram(f"Coarse {name}/{param_name}", param_value, i)
                             writer.flush()
 
             for name, module in model_fine.named_modules():
-                if isinstance(module, (torch.nn.Linear)) and name not in excluded_layers:
                     for param_name, param_value in module.named_parameters():
                         if 'weight' in param_name:  # Ensure only weights are logged
-                            writer.add_histogram(f"{name}/{param_name}", param_value, i)
+                            writer.add_histogram(f"Fine {name}/{param_name}", param_value, i)
                             writer.flush()
 
     print("consolidating files")
