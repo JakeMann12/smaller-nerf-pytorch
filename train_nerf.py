@@ -172,28 +172,38 @@ def main():
 
     # Setup logging.
     logdir = os.path.join(cfg.experiment.logdir, cfg.experiment.id)
+
+    [os.remove(os.path.join(root, file)) for root, dirs, files in os.walk(logdir) for file in files]
+    print('cleared out dirty files')
+
     os.makedirs(logdir, exist_ok=True)
     writer = SummaryWriter(logdir)
-    # Write out config parameters.
+
     with open(os.path.join(logdir, "config.yml"), "w") as f:
         f.write(cfg.dump())  # cfg, f, default_flow_style=False)
 
     if os.path.exists(configargs.load_checkpoint):
         checkpoint = torch.load(configargs.load_checkpoint)
-        postcoarse = None; postfine = None
-        # Load state dictionaries with support for both pruned and unpruned models
-        if "model_coarse_state_dict" in checkpoint:
-            load_pruned_state_dict(model_coarse, checkpoint["model_coarse_state_dict"])
-            #postcoarse = 'coarse' #for end-of code data consolidation
-        if model_fine and "model_fine_state_dict" in checkpoint:
-            load_pruned_state_dict(model_fine, checkpoint["model_fine_state_dict"])
-            #postfine = 'fine'
-        if "optimizer_state_dict" in checkpoint:
-            optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-        start_iter = checkpoint.get("iter", 0)
         print(f"Success loading {configargs.load_checkpoint}")
     else:
-        print(f"{configargs.load_checkpoint} doesn't exist! Wrong path perhaps?")
+        if configargs.load_checkpoint != "":
+            print(f"{configargs.load_checkpoint} doesn't exist! Wrong path perhaps?")
+        else:
+            def_check = os.path.join(cfg.dataset.cachedir, "checkpoint00000.ckpt")
+            print(f'no checkpoint given. Starting from {def_check}!')
+        try:
+            checkpoint = torch.load(def_check)###### checkpoint = torch.load("pretrained/")    
+        except:
+            print(f"YOU HAVEN'T PUT A PRETRAINED 0 it MODEL IN {str(cfg.dataset.cachedir)}")
+
+    # Load state dictionaries with support for both pruned and unpruned models
+    if "model_coarse_state_dict" in checkpoint:
+        load_pruned_state_dict(model_coarse, checkpoint["model_coarse_state_dict"])
+    if model_fine and "model_fine_state_dict" in checkpoint:
+        load_pruned_state_dict(model_fine, checkpoint["model_fine_state_dict"])
+    if "optimizer_state_dict" in checkpoint:
+        optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+    start_iter = checkpoint.get("iter", 0)
         
 
     # # TODO: Prepare raybatch tensor if batching random rays
@@ -211,6 +221,8 @@ def main():
             # Determine the current fraction of completed training
             total_iters = cfg.experiment.train_iters - start_iter
             current_progress = (i - start_iter) / total_iters
+
+            print(f"\n{times_to_prune}, \n{pruning_intervals}")
 
             # Find the appropriate pruning amount based on the current training progress
             current_prune_level = 0
@@ -484,9 +496,8 @@ def main():
     #start iter, cfg.experiment.train_iters
     # {postcoarse}{postfine}
     #get_prune_type = lambda path: path.split('/')[2].split()[0] if len(path.split('/')) >= 3 else None
-    #scratch = #get_prune_type(str(configargs.load_checkpoint))
     # P- PRUNE, CQ - COARSE QUANT, FQ - FINE QUANT
-    exp_name = f"P{configargs.prune}-CQ{cfg.models.coarse.n_bits}-FQ{cfg.models.fine.n_bits}_{str(start_iter/1000)[:3]}-{str(cfg.experiment.train_iters/1000)[:3]}k"
+    exp_name = f"P{configargs.prune}-CQ{cfg.models.coarse.n_bits}-FQ{cfg.models.fine.n_bits}_{str(start_iter/1000)}-{str(cfg.experiment.train_iters/1000)}k"
     new_folder_path = os.path.join(logdir, exp_name)
     os.makedirs(new_folder_path, exist_ok=True)
 
@@ -497,7 +508,7 @@ def main():
         if os.path.isfile(item_path):
             # Move the file to the new folder
             shutil.move(item_path, new_folder_path)
-    print("Done!")
+    print(f"Done! Everything model to {exp_name}")
 
 
 def cast_to_image(tensor):

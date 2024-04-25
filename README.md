@@ -118,15 +118,13 @@ A Colab notebook for the _full_ NeRF model (albeit on low-resolution data) can b
 
 ## Render fun videos (from a pretrained model)
 
-Once you've trained your NeRF, it's time to use that to render the scene. Use the `eval_nerf.py` script to do that. For the `lego-lowres` example, this would be
+Once you've trained your NeRF, it's time to use that to render the scene. Use the `eval_nerf.py` script to do that, inputting the path to where you have just trained the model and saved the checkpoints/configs. For example:
 ```bash
-python eval_nerf.py --config config/lego.yml --checkpoint logs/lego-lowres3/TRIAL250-265k/checkpoint264999.ckpt --savedir "results/lego-lowres trial"
+python eval_nerf.py --logdir "logs/lego-lowres3/1k32bitquant"
 ```
+`--logdir` is optional. If nothing is passed, it will use the most recently modified trial folder in the 'logs' directory. This is helpful as trial names get more elaborate.
 
-You can create a `gif` out of the saved images by using:
-```bash
-python makegif.py "results/lego-lowres trial"
-```
+This will create a `gif` in the trial folder, as well as a results folder containing the constituent images.
 
 This should give you a gif like this.
 

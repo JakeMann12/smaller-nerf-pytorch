@@ -35,6 +35,7 @@ class STE(torch.autograd.Function):
                 R = torch.round(step * ws)/step
                 # Scale the quantized weight R back with alpha and beta
                 wq = (R * alpha) + beta
+                #print(f"ASYM QUANT WITH {bit} BITS")
 
             else:
                 # Scale w with alpha and beta so that all elements in ws are between -1 and 1

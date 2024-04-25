@@ -8,6 +8,8 @@ import torch
 import torchvision
 import yaml
 import glob
+from PIL import Image
+
 
 from nerf import (
     CfgNode,
@@ -20,7 +22,6 @@ from nerf import (
     load_pruned_state_dict
 )
 
-
 def cast_to_image(tensor, dataset_type):
     # Input tensor is (H, W, 3). Convert to (3, H, W).
     tensor = tensor.permute(2, 0, 1)
@@ -30,6 +31,16 @@ def cast_to_image(tensor, dataset_type):
     # # Map back to shape (3, H, W), as tensorboard needs channels first.
     # return np.moveaxis(img, [-1], [0])
 
+def create_gif(folder_path, frame_duration=200):
+    # Makes gif from results pics, puts it in parent folder.
+    file_paths = sorted([os.path.join(folder_path, file_name) for file_name in os.listdir(folder_path) if file_name.endswith('.png')])
+    images = [Image.open(file_path) for file_path in file_paths]
+    parent_folder = os.path.basename(os.path.dirname(folder_path))
+    output_filename = f"{parent_folder}.gif"
+    image_directory = os.path.dirname(folder_path)
+    output_path = os.path.join(image_directory, output_filename)
+    images[0].save(output_path, save_all=True, append_images=images[1:], optimize=False, duration=frame_duration, loop=0)
+    print(f'GIF saved at {output_path}')
 
 def cast_to_disparity_image(tensor):
     img = (tensor - tensor.min()) / (tensor.max() - tensor.min())
@@ -61,14 +72,24 @@ def main():
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--logdir", type=str, required=True, help="Path to directory containing checkpoint and config files."
+        "--logdir", type=str, help="Path to directory containing checkpoint and config files. If none, uses most recent trial in logs"
     )
     configargs = parser.parse_args()
 
+    if configargs.logdir is None:
+        # Find the most recently modified folder in 'logs'
+        log_parent_dir = 'logs'
+        log_folders = sorted(glob.glob(os.path.join(log_parent_dir, '*')), key=os.path.getmtime, reverse=True)
+        most_recent_logdir = log_folders[0]
+        # Within the most recently modified folder, find the most recently modified sub-folder
+        subfolders = sorted(glob.glob(os.path.join(most_recent_logdir, '*')), key=os.path.getmtime, reverse=True)
+        configargs.logdir = subfolders[0]
+    print(f"\nIn logdir {configargs.logdir}")
+
     checkpoint = find_checkpoint(configargs.logdir)
-    print("Found checkpoint file:", checkpoint)
     config = find_config(configargs.logdir)
-    print("Found config file:", config)
+
+    print(f"\nIn logdir {configargs.logdir}, evaluating:\n{os.path.basename(config)} config and \n{os.path.basename(checkpoint)}\n")
 
     # Read config file.
     cfg = None
@@ -208,6 +229,7 @@ def main():
         )
             
         tqdm.write(f"Avg time per image: {sum(times_per_image) / (i + 1)}")
+    create_gif(os.path.join(configargs.logdir, "results"))
 
 
 if __name__ == "__main__":
