@@ -173,8 +173,8 @@ def main():
     # Setup logging.
     logdir = os.path.join(cfg.experiment.logdir, cfg.experiment.id)
 
-    [os.remove(os.path.join(root, file)) for root, dirs, files in os.walk(logdir) for file in files]
-    print('cleared out dirty files')
+    #[os.remove(os.path.join(root, file)) for root, dirs, files in os.walk(logdir) for file in files]
+    #print('cleared out dirty files')
 
     os.makedirs(logdir, exist_ok=True)
     writer = SummaryWriter(logdir)
@@ -508,7 +508,7 @@ def main():
         if os.path.isfile(item_path):
             # Move the file to the new folder
             shutil.move(item_path, new_folder_path)
-    print(f"Done! Everything model to {exp_name}")
+    print(f"Done! Folder {exp_name}")
 
 
 def cast_to_image(tensor):
