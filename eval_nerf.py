@@ -1,13 +1,13 @@
 import argparse
-import os
 import time
-
+import os
 import imageio
+from tqdm import tqdm
 import numpy as np
 import torch
 import torchvision
 import yaml
-from tqdm import tqdm
+import glob
 
 from nerf import (
     CfgNode,
@@ -36,30 +36,43 @@ def cast_to_disparity_image(tensor):
     img = img.clamp(0, 1) * 255
     return img.detach().cpu().numpy().astype(np.uint8)
 
+def find_checkpoint(logdir):
+    checkpoint_files = glob.glob(os.path.join(logdir, '*.ckpt'))
+    if not checkpoint_files:
+        raise ValueError("No checkpoint files found in the log directory.")
+    
+    # Sort checkpoint files based on the numeric value in the filename
+    checkpoint_files.sort(key=lambda x: int(''.join(filter(str.isdigit, x))))
+    
+    # Get the file with the highest number
+    latest_checkpoint = checkpoint_files[-1]
+    return latest_checkpoint
+
+def find_config(logdir):
+    config_files = glob.glob(os.path.join(logdir, 'config.yml'))
+    if not config_files:
+        raise ValueError("No config YAML file found in the log directory.")
+    elif len(config_files) > 1:
+        raise ValueError("More than one config YAML file found in the log directory.")
+    else:
+        return config_files[0]
 
 def main():
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--config", type=str, required=True, help="Path to (.yml) config file."
-    )
-    parser.add_argument(
-        "--checkpoint",
-        type=str,
-        required=True,
-        help="Checkpoint / pre-trained model to evaluate.",
-    )
-    parser.add_argument(
-        "--savedir", type=str, help="Save images to this directory, if specified."
-    )
-    parser.add_argument(
-        "--save-disparity-image", action="store_true", help="Save disparity images too."
+        "--logdir", type=str, required=True, help="Path to directory containing checkpoint and config files."
     )
     configargs = parser.parse_args()
 
+    checkpoint = find_checkpoint(configargs.logdir)
+    print("Found checkpoint file:", checkpoint)
+    config = find_config(configargs.logdir)
+    print("Found config file:", config)
+
     # Read config file.
     cfg = None
-    with open(configargs.config, "r") as f:
+    with open(config, "r") as f:
         cfg_dict = yaml.load(f, Loader=yaml.FullLoader)
         cfg = CfgNode(cfg_dict)
 
@@ -111,7 +124,7 @@ def main():
         include_input_xyz=cfg.models.coarse.include_input_xyz,
         include_input_dir=cfg.models.coarse.include_input_dir,
         use_viewdirs=cfg.models.coarse.use_viewdirs,
-         Nbits = cfg.models.coarse.n_bits if type(cfg.models.coarse.n_bits) == int else None,
+        Nbits = cfg.models.coarse.n_bits if type(cfg.models.coarse.n_bits) == int else None,
         symmetric = cfg.models.coarse.symmetricquant
     
     )
@@ -132,7 +145,7 @@ def main():
         model_fine.to(device)
 
     # Load the checkpoint
-    checkpoint = torch.load(configargs.checkpoint, map_location=device)
+    checkpoint = torch.load(checkpoint, map_location=device)
     print("Checkpoint keys:")
     for key in checkpoint["model_coarse_state_dict"].keys():
         print(key)
@@ -161,9 +174,8 @@ def main():
     render_poses = render_poses.float().to(device)
 
     # Create directory to save images to.
-    os.makedirs(configargs.savedir, exist_ok=True)
-    if configargs.save_disparity_image:
-        os.makedirs(os.path.join(configargs.savedir, "disparity"), exist_ok=True)
+    resultsfolder = os.path.join(configargs.logdir, "results")
+    os.makedirs(resultsfolder, exist_ok=True)
 
     # Evaluation loop
     times_per_image = []
@@ -188,17 +200,13 @@ def main():
                 encode_direction_fn=encode_direction_fn,
             )
             rgb = rgb_fine if rgb_fine is not None else rgb_coarse
-            if configargs.save_disparity_image:
-                disp = disp_fine if disp_fine is not None else disp_coarse
         times_per_image.append(time.time() - start)
-        if configargs.savedir:
-            savefile = os.path.join(configargs.savedir, f"{i:04d}.png")
-            imageio.imwrite(
-                savefile, cast_to_image(rgb[..., :3], cfg.dataset.type.lower())
-            )
-            if configargs.save_disparity_image:
-                savefile = os.path.join(configargs.savedir, "disparity", f"{i:04d}.png")
-                imageio.imwrite(savefile, cast_to_disparity_image(disp))
+        
+        savefile = os.path.join(resultsfolder, f"{i:04d}.png")
+        imageio.imwrite(
+            savefile, cast_to_image(rgb[..., :3], cfg.dataset.type.lower())
+        )
+            
         tqdm.write(f"Avg time per image: {sum(times_per_image) / (i + 1)}")
 
 

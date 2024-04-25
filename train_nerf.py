@@ -157,7 +157,7 @@ def main():
             include_input_xyz=cfg.models.fine.include_input_xyz,
             include_input_dir=cfg.models.fine.include_input_dir,
             use_viewdirs=cfg.models.fine.use_viewdirs,
-            Nbits = None, #cfg.models.fine.n_bits if type(cfg.models.fine.n_bits) == int else None,
+            Nbits = cfg.models.fine.n_bits if type(cfg.models.fine.n_bits) == int else None,
             symmetric = cfg.models.fine.symmetricquant
         )
         model_fine.to(device)
@@ -483,8 +483,10 @@ def main():
     print("consolidating files")
     #start iter, cfg.experiment.train_iters
     # {postcoarse}{postfine}
-    get_prune_type = lambda path: path.split('/')[2].split()[0] if len(path.split('/')) >= 3 else None
-    exp_name = f"Post {get_prune_type(str(configargs.load_checkpoint))} Pruning {str(start_iter)[:3]}-{str(cfg.experiment.train_iters)[:3]}k"
+    #get_prune_type = lambda path: path.split('/')[2].split()[0] if len(path.split('/')) >= 3 else None
+    #scratch = #get_prune_type(str(configargs.load_checkpoint))
+    # P- PRUNE, CQ - COARSE QUANT, FQ - FINE QUANT
+    exp_name = f"P{configargs.prune}-CQ{cfg.models.coarse.n_bits}-FQ{cfg.models.fine.n_bits}_{str(start_iter/1000)[:3]}-{str(cfg.experiment.train_iters/1000)[:3]}k"
     new_folder_path = os.path.join(logdir, exp_name)
     os.makedirs(new_folder_path, exist_ok=True)
 
