@@ -173,8 +173,8 @@ def main():
     # Setup logging.
     logdir = os.path.join(cfg.experiment.logdir, cfg.experiment.id)
 
-    [os.remove(os.path.join(root, file)) for root, dirs, files in os.walk(logdir) for file in files]
-    print('cleared out dirty files')
+    #[os.remove(os.path.join(root, file)) for root, dirs, files in os.walk(logdir) for file in files]
+    #print('cleared out dirty files')
 
     os.makedirs(logdir, exist_ok=True)
     writer = SummaryWriter(logdir)
