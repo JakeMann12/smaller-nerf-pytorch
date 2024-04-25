@@ -144,6 +144,8 @@ def main():
         include_input_xyz=cfg.models.coarse.include_input_xyz,
         include_input_dir=cfg.models.coarse.include_input_dir,
         use_viewdirs=cfg.models.coarse.use_viewdirs,
+        Nbits = cfg.models.coarse.n_bits if type(cfg.models.coarse.n_bits) == int else None,
+        symmetric = cfg.models.coarse.symmetricquant
     )
     model_coarse.to(device)
     # If a fine-resolution model is specified, initialize it.
@@ -155,6 +157,8 @@ def main():
             include_input_xyz=cfg.models.fine.include_input_xyz,
             include_input_dir=cfg.models.fine.include_input_dir,
             use_viewdirs=cfg.models.fine.use_viewdirs,
+            Nbits = cfg.models.fine.n_bits if type(cfg.models.fine.n_bits) == int else None,
+            symmetric = cfg.models.fine.symmetricquant
         )
         model_fine.to(device)
 
@@ -168,28 +172,38 @@ def main():
 
     # Setup logging.
     logdir = os.path.join(cfg.experiment.logdir, cfg.experiment.id)
+
+    [os.remove(os.path.join(root, file)) for root, dirs, files in os.walk(logdir) for file in files]
+    print('cleared out dirty files')
+
     os.makedirs(logdir, exist_ok=True)
     writer = SummaryWriter(logdir)
-    # Write out config parameters.
+
     with open(os.path.join(logdir, "config.yml"), "w") as f:
         f.write(cfg.dump())  # cfg, f, default_flow_style=False)
 
     if os.path.exists(configargs.load_checkpoint):
         checkpoint = torch.load(configargs.load_checkpoint)
-        postcoarse = None; postfine = None
-        # Load state dictionaries with support for both pruned and unpruned models
-        if "model_coarse_state_dict" in checkpoint:
-            load_pruned_state_dict(model_coarse, checkpoint["model_coarse_state_dict"])
-            #postcoarse = 'coarse' #for end-of code data consolidation
-        if model_fine and "model_fine_state_dict" in checkpoint:
-            load_pruned_state_dict(model_fine, checkpoint["model_fine_state_dict"])
-            #postfine = 'fine'
-        if "optimizer_state_dict" in checkpoint:
-            optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-        start_iter = checkpoint.get("iter", 0)
         print(f"Success loading {configargs.load_checkpoint}")
     else:
-        print(f"{configargs.load_checkpoint} doesn't exist! Wrong path perhaps?")
+        if configargs.load_checkpoint != "":
+            print(f"{configargs.load_checkpoint} doesn't exist! Wrong path perhaps?")
+        else:
+            def_check = os.path.join(cfg.dataset.cachedir, "checkpoint00000.ckpt")
+            print(f'no checkpoint given. Starting from {def_check}!')
+        try:
+            checkpoint = torch.load(def_check)###### checkpoint = torch.load("pretrained/")    
+        except:
+            print(f"YOU HAVEN'T PUT A PRETRAINED 0 it MODEL IN {str(cfg.dataset.cachedir)}")
+
+    # Load state dictionaries with support for both pruned and unpruned models
+    if "model_coarse_state_dict" in checkpoint:
+        load_pruned_state_dict(model_coarse, checkpoint["model_coarse_state_dict"])
+    if model_fine and "model_fine_state_dict" in checkpoint:
+        load_pruned_state_dict(model_fine, checkpoint["model_fine_state_dict"])
+    if "optimizer_state_dict" in checkpoint:
+        optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+    start_iter = checkpoint.get("iter", 0)
         
 
     # # TODO: Prepare raybatch tensor if batching random rays
@@ -204,10 +218,11 @@ def main():
 
         #%% TRAINING
         if configargs.prune is not None: 
-            #print('\n\n\n\n\n\nPRUNING')
             # Determine the current fraction of completed training
             total_iters = cfg.experiment.train_iters - start_iter
             current_progress = (i - start_iter) / total_iters
+
+            print(f"\n{times_to_prune}, \n{pruning_intervals}")
 
             # Find the appropriate pruning amount based on the current training progress
             current_prune_level = 0
@@ -222,32 +237,17 @@ def main():
             if current_progress in pruning_intervals:
                 if configargs.prune == "coarse" or configargs.prune == "both":
                     for name, module in model_coarse.named_modules():
-                        if isinstance(module, (torch.nn.Conv2d, torch.nn.Linear)) and name not in excluded_layers:
+                        if isinstance(module, (torch.nn.Linear)) and name not in excluded_layers:
                             prune.ln_structured(module, name='weight', amount=current_prune_level, n=1, dim=0)
-
-                            # Log the pruned weights
-                            for param_tensor in module.named_parameters():
-                                param_name, param_value = param_tensor
-                                if 'weight' in param_name:  # Ensure only weights are logged
-                                    writer.add_histogram(f"{name}/{param_name}", param_value, i)
-                                    writer.flush()
-                                
                             print(f'Pruned coarse {name} to {current_prune_level * 100:.2f}% at {current_progress * 100:.1f}% of training')
 
                 # Pruning the fine model
                 if configargs.prune == "fine" or configargs.prune == "both":  # Check if there is a fine model defined
                     for name, module in model_fine.named_modules():
-                        if isinstance(module, (torch.nn.Conv2d, torch.nn.Linear)) and name not in excluded_layers:
+                        if isinstance(module, (torch.nn.Linear)) and name not in excluded_layers:
                             prune.ln_structured(module, name='weight', amount=current_prune_level, n=1, dim=0)
-                            
-                            # Log the pruned weights
-                            for param_tensor in module.named_parameters():
-                                param_name, param_value = param_tensor
-                                if 'weight' in param_name:  # Ensure only weights are logged
-                                    writer.add_histogram(f"{name}/{param_name}", param_value, i)
-                                    writer.flush()
                             print(f'Pruned fine {name} to {current_prune_level * 100:.2f}% at {current_progress * 100:.1f}% of training')
- 
+
 
         if USE_CACHED_DATASET:
             #print("USING CACHED DATASET")
@@ -438,7 +438,7 @@ def main():
                 psnr = mse2psnr(loss.item())
                 writer.add_scalar("validation/loss", loss.item(), i)
                 writer.add_scalar("validation/coarse_loss", coarse_loss.item(), i)
-                writer.add_scalar("validataion/psnr", psnr, i)
+                writer.add_scalar("validation/psnr", psnr, i)
                 writer.add_image(
                     "validation/rgb_coarse", cast_to_image(rgb_coarse[..., :3]), i
                 )
@@ -477,12 +477,27 @@ def main():
                 os.path.join(logdir, pruneaddon + "checkpoint" + str(i).zfill(5) + ".ckpt"),
             )
             tqdm.write("================== Saved Checkpoint =================")
+            # Log the weights regardless of pruning
+            for name, module in model_coarse.named_modules():
+                if isinstance(module, (torch.nn.Linear)) and name not in excluded_layers:
+                    for param_name, param_value in module.named_parameters():
+                        if 'weight' in param_name:  # Ensure only weights are logged
+                            writer.add_histogram(f"{name}/{param_name}", param_value, i)
+                            writer.flush()
+
+            for name, module in model_fine.named_modules():
+                if isinstance(module, (torch.nn.Linear)) and name not in excluded_layers:
+                    for param_name, param_value in module.named_parameters():
+                        if 'weight' in param_name:  # Ensure only weights are logged
+                            writer.add_histogram(f"{name}/{param_name}", param_value, i)
+                            writer.flush()
 
     print("consolidating files")
     #start iter, cfg.experiment.train_iters
     # {postcoarse}{postfine}
-    get_prune_type = lambda path: path.split('/')[2].split()[0] if len(path.split('/')) >= 3 else None
-    exp_name = f"Post {get_prune_type(str(configargs.load_checkpoint))} Pruning {str(start_iter)[:3]}-{str(cfg.experiment.train_iters)[:3]}k"
+    #get_prune_type = lambda path: path.split('/')[2].split()[0] if len(path.split('/')) >= 3 else None
+    # P- PRUNE, CQ - COARSE QUANT, FQ - FINE QUANT
+    exp_name = f"P{configargs.prune}-CQ{cfg.models.coarse.n_bits}-FQ{cfg.models.fine.n_bits}_{str(start_iter/1000)}-{str(cfg.experiment.train_iters/1000)}k"
     new_folder_path = os.path.join(logdir, exp_name)
     os.makedirs(new_folder_path, exist_ok=True)
 
@@ -493,7 +508,7 @@ def main():
         if os.path.isfile(item_path):
             # Move the file to the new folder
             shutil.move(item_path, new_folder_path)
-    print("Done!")
+    print(f"Done! Everything model to {exp_name}")
 
 
 def cast_to_image(tensor):

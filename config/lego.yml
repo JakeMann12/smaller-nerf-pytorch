@@ -7,13 +7,13 @@ experiment:
   # Seed for random number generators (for repeatability).
   randomseed: 42  # Cause, why not?
   # Number of training iterations.
-  train_iters: 450000
+  train_iters: 5000
   # Number of training iterations after which to validate.
-  validate_every: 500
+  validate_every: 250
   # Number of training iterations after which to checkpoint.
-  save_every: 20000
+  save_every: 2500
   # Number of training iterations after which to print progress.
-  print_every: 2000
+  print_every: 500
 
 # Dataset parameters.
 dataset:
@@ -70,6 +70,10 @@ models:
     # Whether or not to perform log sampling in the positional encoding
     # of the direction.
     log_sampling_dir: True
+    #QUANTIZATION
+    n_bits: None
+    symmetricquant: False
+
   # Fine model.
   fine:
     # Name of the torch.nn.Module class that implements the model.
@@ -101,6 +105,9 @@ models:
     # Whether or not to perform log sampling in the positional encoding
     # of the direction.
     log_sampling_dir: True
+    #QUANTIZATION
+    n_bits: None
+    symmetricquant: False
 
 # Optimizer params.
 optimizer:
@@ -165,30 +172,13 @@ nerf:
     lindisp: False
 
 pruning:
-  
     # The maximum fraction of units to be pruned by the end of the training.
     # This value should be between 0 and 1, where 1 means 100% of the units are pruned.
     max_prune_amount: 0.25
 
-    # Interval of training iterations at which the pruning amount is increased.
-    # This value determines how frequently the model's weights are pruned.
-    increment_iter: 10000
-
     # The amount by which the pruning fraction is increased at each interval.
     # This incremental approach allows the network to gradually adjust to reduced complexity.
     prune_increment: 0.05
-
-    # Specifies whether structured or unstructured pruning is used.
-    # Structured pruning removes entire neurons or filters, whereas unstructured pruning removes individual weights.
-    pruning_type: "structured"
-
-    # For structured pruning, specifies the norm type used to determine the importance of filters or neurons.
-    # Common norms are 1 (L1) for sum of absolute values, and 2 (L2) for sum of squares.
-    norm_type: 1
-
-    # Dimension along which pruning is applied, typically 0 for pruning filters in Conv2D layers and 1 for neurons in Linear layers.
-    # This depends on the layer type and the pruning strategy.
-    pruning_dim: 0
 
     # List of layer names to exclude from pruning.
     # Use this to protect critical layers whose performance impact from pruning might be detrimental.

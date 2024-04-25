@@ -1,5 +1,73 @@
 import torch
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import math
+import numpy as np
 
+device = "cuda" if torch.cuda.is_available() else "cpu"
+
+class STE(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, w, bit, symmetric=False):
+        '''
+        symmetric: True for symmetric quantization, False for asymmetric quantization
+        '''
+        if bit is None:
+            wq = w
+        elif bit==0:
+            wq = np.zeros_like(w)
+        else:
+            # Build a mask to record position of zero weights
+            weights_cpu = w.cpu().detach().numpy()
+            weight_mask = np.where(np.abs(weights_cpu) != 0, 1, 0)
+            # Lab3 (a), Your code here:
+            if symmetric == False:
+                # Compute alpha (scale) for dynamic scaling
+                alpha = torch.max(w) - torch.min(w)
+                # Compute beta (bias) for dynamic scaling
+                beta = torch.min(w)
+                # Scale w with alpha and beta so that all elements in ws are between 0 and 1
+                ws = (w - beta) / alpha
+                # Calculate quantization step size
+                step = 2 ** bit - 1
+                # Quantize ws with a linear quantizer to "bit" bits
+                R = torch.round(step * ws)/step
+                # Scale the quantized weight R back with alpha and beta
+                wq = (R * alpha) + beta
+                #print(f"ASYM QUANT WITH {bit} BITS")
+
+            else:
+                # Scale w with alpha and beta so that all elements in ws are between -1 and 1
+                ws = (2**(bit-1)-1)/(torch.max(torch.abs(w)))
+                R = torch.round(w*ws)
+                wq = R * ws   
+            wq = wq * torch.tensor(weight_mask).to(device)
+        return wq
+
+    @staticmethod
+    def backward(ctx, g):
+        return g, None, None
+
+class FP_Linear(nn.Module):
+    def __init__(self, in_features, out_features, Nbits=None, symmetric=False):
+        super(FP_Linear, self).__init__()
+        self.in_features = in_features
+        self.out_features = out_features
+        self.linear = nn.Linear(in_features, out_features)
+        self.Nbits = Nbits
+        self.symmetric = symmetric
+        
+        # Initailization
+        #m = self.in_features #commented for now
+        #n = self.out_features
+        #self.linear.weight.data.normal_(0, math.sqrt(2. / (m+n)))
+
+    def forward(self, x):
+        #print("Layer Name:", self.__class__.__name__)
+
+        fin = F.linear(x, STE.apply(self.linear.weight, self.Nbits, self.symmetric), self.linear.bias)
+        return fin
 
 class VeryTinyNeRFModel(torch.nn.Module):
     r"""Define a "very tiny" NeRF model comprising three fully connected layers.
@@ -193,6 +261,8 @@ class FlexibleNeRFModel(torch.nn.Module):
         include_input_xyz=True,
         include_input_dir=True,
         use_viewdirs=True,
+        Nbits=None,  # Add Nbits parameter for quantization
+        symmetric=False  # Add symmetric parameter for quantization
     ):
         super(FlexibleNeRFModel, self).__init__()
 
@@ -203,16 +273,18 @@ class FlexibleNeRFModel(torch.nn.Module):
         self.skip_connect_every = skip_connect_every
         if not use_viewdirs:
             self.dim_dir = 0
-
+        #DONT QUANTIZE START LAYER
         self.layer1 = torch.nn.Linear(self.dim_xyz, hidden_size)
         self.layers_xyz = torch.nn.ModuleList()
         for i in range(num_layers - 1):
             if i % self.skip_connect_every == 0 and i > 0 and i != num_layers - 1:
                 self.layers_xyz.append(
-                    torch.nn.Linear(self.dim_xyz + hidden_size, hidden_size)
+                    #torch.nn.Linear(self.dim_xyz + hidden_size, hidden_size)
+                    FP_Linear(self.dim_xyz + hidden_size, hidden_size, Nbits, symmetric)
                 )
             else:
-                self.layers_xyz.append(torch.nn.Linear(hidden_size, hidden_size))
+                #self.layers_xyz.append(torch.nn.Linear(hidden_size, hidden_size))
+                self.layers_xyz.append(FP_Linear(hidden_size, hidden_size, Nbits, symmetric))
 
         self.use_viewdirs = use_viewdirs
         if self.use_viewdirs:
@@ -221,7 +293,7 @@ class FlexibleNeRFModel(torch.nn.Module):
             self.layers_dir.append(
                 torch.nn.Linear(self.dim_dir + hidden_size, hidden_size // 2)
             )
-
+            # DONT QUANTIZE THE FINAL ONES
             self.fc_alpha = torch.nn.Linear(hidden_size, 1)
             self.fc_rgb = torch.nn.Linear(hidden_size // 2, 3)
             self.fc_feat = torch.nn.Linear(hidden_size, hidden_size)
