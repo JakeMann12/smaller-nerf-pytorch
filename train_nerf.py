@@ -508,7 +508,7 @@ def main():
         if os.path.isfile(item_path):
             # Move the file to the new folder
             shutil.move(item_path, new_folder_path)
-    print(f"Done! Everything model to {exp_name}")
+    print(f"Done! Folder {exp_name}")
 
 
 def cast_to_image(tensor):
