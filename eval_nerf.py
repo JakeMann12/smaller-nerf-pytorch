@@ -167,13 +167,14 @@ def main():
 
     # Load the checkpoint
     checkpoint = torch.load(checkpoint, map_location=device)
-    print("Checkpoint keys:")
-    for key in checkpoint["model_coarse_state_dict"].keys():
-        print(key)
 
     # Apply the function to load pruned state dicts
     if "model_coarse_state_dict" in checkpoint:
         load_pruned_state_dict(model_coarse, checkpoint["model_coarse_state_dict"])
+        
+        print("Coarse Checkpoint keys:")
+        for key in checkpoint["model_coarse_state_dict"].keys():
+            print(key)
 
     if model_fine and "model_fine_state_dict" in checkpoint:
         try:

@@ -71,7 +71,7 @@ models:
     # of the direction.
     log_sampling_dir: True
     #QUANTIZATION
-    n_bits: 8
+    n_bits: 2
     symmetricquant: False
 
   # Fine model.
@@ -106,7 +106,7 @@ models:
     # of the direction.
     log_sampling_dir: True
     #QUANTIZATION
-    n_bits: 8
+    n_bits: 2
     symmetricquant: False
 
 # Optimizer params.

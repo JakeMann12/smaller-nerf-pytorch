@@ -4,7 +4,6 @@ from typing import Optional
 import torch
 
 
-
 def img2mse(img_src, img_tgt):
     return torch.nn.functional.mse_loss(img_src, img_tgt)
 
