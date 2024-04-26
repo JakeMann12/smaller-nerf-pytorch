@@ -215,8 +215,8 @@ def main():
     weight_mask_f = {}
     if configargs.prune is None:
         for name, module in model_coarse.named_modules():
-                if isinstance(module, (torch.nn.Linear)) and name not in excluded_layers:
-                    weight_mask_c[name] = torch.tensor(np.where(np.abs(module.weight.data.cpu().detach().numpy()) != 0, 1, 0)).to(device)
+            if isinstance(module, (torch.nn.Linear)) and name not in excluded_layers:
+                weight_mask_c[name] = torch.tensor(np.where(np.abs(module.weight.data.cpu().detach().numpy()) != 0, 1, 0)).to(device)
         for name, module in model_fine.named_modules():
             if isinstance(module, (torch.nn.Linear)) and name not in excluded_layers:
                 weight_mask_f[name] = torch.tensor(np.where(np.abs(module.weight.data.cpu().detach().numpy()) != 0, 1, 0)).to(device)
@@ -529,7 +529,7 @@ def main():
     
     # P- PRUNE, CQ - COARSE QUANT, FQ - FINE QUANT
     exp_name = f"P{configargs.prune}-CQ{cfg.models.coarse.n_bits}-FQ{cfg.models.fine.n_bits}_{str(start_iter/1000)}-{str(cfg.experiment.train_iters/1000)}k"
-    prev_ckpt = 'post'+str(configargs.load_checkpoint).split('\\')[2].split('P', 1)[1].split('-', 1)[0] if configargs.load_checkpoint is not None else ""
+    prev_ckpt = 'post'+str(configargs.load_checkpoint).split('\\')[2].split('P', 1)[1].split('-', 1)[0] if configargs.load_checkpoint != "" else ""
     new_folder_path = os.path.join(logdir, exp_name + prev_ckpt)
     os.makedirs(new_folder_path, exist_ok=True)
 
