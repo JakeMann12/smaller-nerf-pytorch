@@ -246,16 +246,20 @@ class FlexibleNeRFModel(torch.nn.Module):
             self.dim_dir = 0
         #DONT QUANTIZE START LAYER
         self.layer1 = torch.nn.Linear(self.dim_xyz, hidden_size)
+        
+        # Subsequent layers
         self.layers_xyz = torch.nn.ModuleList()
-        for i in range(num_layers - 1):
-            if i % self.skip_connect_every == 0 and i > 0 and i != num_layers - 1:
+        for i in range(1, num_layers):
+            if i % self.skip_connect_every == 0 and i != num_layers - 1:
                 self.layers_xyz.append(
-                    torch.nn.Linear(self.dim_xyz + hidden_size, hidden_size)
-                    #FP_Linear(self.dim_xyz + hidden_size, hidden_size, Nbits, symmetric)
+                    FP_Linear(self.dim_xyz + hidden_size, hidden_size, Nbits, symmetric) 
+                    if type(Nbits) == int else torch.nn.Linear(hidden_size, hidden_size)
                 )
             else:
-                self.layers_xyz.append(torch.nn.Linear(hidden_size, hidden_size))
-               # self.layers_xyz.append(FP_Linear(hidden_size, hidden_size, Nbits, symmetric))
+                self.layers_xyz.append(
+                    FP_Linear(hidden_size, hidden_size, Nbits, symmetric) 
+                    if type(Nbits) == int else torch.nn.Linear(hidden_size, hidden_size)
+                )
 
         self.use_viewdirs = use_viewdirs
         if self.use_viewdirs:

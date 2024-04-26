@@ -19,6 +19,11 @@ from nerf import (CfgNode, get_embedding_function, get_ray_bundle, img2mse,
                   load_blender_data, load_llff_data, meshgrid_xy, models,
                   mse2psnr, run_one_iter_of_nerf, load_pruned_state_dict)
 
+def pruning_percentage(tensor):
+    total_elements = tensor.numel()
+    zero_elements = (tensor == 0).sum().item()
+    return (zero_elements / total_elements) * 100
+
 def main():
 
     parser = argparse.ArgumentParser()
@@ -209,6 +214,18 @@ def main():
     # # TODO: Prepare raybatch tensor if batching random rays
     times_to_prune = 10; pruning_intervals = list(np.linspace(.05,.5,times_to_prune))
     print(f"\n{times_to_prune}, \n{pruning_intervals}")
+    
+    #If we need to preserve pruning in future runs
+    weight_mask_c = {}
+    weight_mask_f = {}
+    if configargs.prune is None:
+        for name, module in model_coarse.named_modules():
+                if isinstance(module, (torch.nn.Linear)) and name not in excluded_layers:
+                    weight_mask_c[name] = torch.tensor(np.where(np.abs(module.weight.data.cpu().detach().numpy()) != 0, 1, 0)).to(device)
+        for name, module in model_fine.named_modules():
+            if isinstance(module, (torch.nn.Linear)) and name not in excluded_layers:
+                weight_mask_f[name] = torch.tensor(np.where(np.abs(module.weight.data.cpu().detach().numpy()) != 0, 1, 0)).to(device)
+
 
     for i in trange(start_iter, cfg.experiment.train_iters):
         model_coarse.train()
@@ -217,14 +234,12 @@ def main():
 
         rgb_coarse, rgb_fine = None, None
         target_ray_values = None
-
+        
         #%% TRAINING
         if configargs.prune is not None: 
             # Determine the current fraction of completed training
             total_iters = cfg.experiment.train_iters - start_iter
             current_progress = (i - start_iter) / total_iters
-
-            
 
             # Find the appropriate pruning amount based on the current training progress
             current_prune_level = 0
@@ -237,6 +252,7 @@ def main():
 
             # Apply structured pruning to each appropriate layer if the current iteration matches a pruning interval
             if current_progress in pruning_intervals:
+                # Pruning the coarse model
                 if configargs.prune == "coarse" or configargs.prune == "both":
                     for name, module in model_coarse.named_modules():
                         if isinstance(module, (torch.nn.Linear)) and name not in excluded_layers:
@@ -249,6 +265,21 @@ def main():
                         if isinstance(module, (torch.nn.Linear)) and name not in excluded_layers:
                             prune.ln_structured(module, name='weight', amount=current_prune_level, n=1, dim=0)
                             print(f'Pruned fine {name} to {current_prune_level * 100:.2f}% at {current_progress * 100:.1f}% of training')
+        
+        else:
+            for name, module in model_coarse.named_modules():
+                if isinstance(module, (torch.nn.Linear)) and name not in excluded_layers:
+                    module.weight.data = module.weight.data * weight_mask_c[name]
+            
+            for name, module in model_fine.named_modules():
+                if isinstance(module, (torch.nn.Linear)) and name not in excluded_layers:
+                    module.weight.data = module.weight.data * weight_mask_f[name]
+
+        #Check the weights anyway
+        for name, module in model_coarse.named_modules():
+            if isinstance(module, (torch.nn.Linear)) and name not in excluded_layers:
+                non_zero_weights = torch.count_nonzero(module.weight).item()
+                writer.add_scalar(f'Non-zero weights/coarse_{name}', non_zero_weights, i)
 
 
         if USE_CACHED_DATASET:

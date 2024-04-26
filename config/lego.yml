@@ -7,7 +7,7 @@ experiment:
   # Seed for random number generators (for repeatability).
   randomseed: 42  # Cause, why not?
   # Number of training iterations.
-  train_iters: 5000
+  train_iters: 4000
   # Number of training iterations after which to validate.
   validate_every: 250
   # Number of training iterations after which to checkpoint.
@@ -71,7 +71,7 @@ models:
     # of the direction.
     log_sampling_dir: True
     #QUANTIZATION
-    n_bits: None
+    n_bits: 16
     symmetricquant: False
 
   # Fine model.
@@ -106,7 +106,7 @@ models:
     # of the direction.
     log_sampling_dir: True
     #QUANTIZATION
-    n_bits: None
+    n_bits: 16
     symmetricquant: False
 
 # Optimizer params.
