@@ -19,11 +19,6 @@ from nerf import (CfgNode, get_embedding_function, get_ray_bundle, img2mse,
                   load_blender_data, load_llff_data, meshgrid_xy, models,
                   mse2psnr, run_one_iter_of_nerf, load_pruned_state_dict)
 
-def pruning_percentage(tensor):
-    total_elements = tensor.numel()
-    zero_elements = (tensor == 0).sum().item()
-    return (zero_elements / total_elements) * 100
-
 def main():
 
     parser = argparse.ArgumentParser()
@@ -212,7 +207,7 @@ def main():
         
 
     # # TODO: Prepare raybatch tensor if batching random rays
-    times_to_prune = 10; pruning_intervals = list(np.linspace(.05,.5,times_to_prune))
+    times_to_prune = 10; pruning_intervals = list(np.linspace(.0,.5,times_to_prune+1))
     print(f"\n{times_to_prune}, \n{pruning_intervals}")
     
     #If we need to preserve pruning in future runs
@@ -280,6 +275,11 @@ def main():
             if isinstance(module, (torch.nn.Linear)) and name not in excluded_layers:
                 non_zero_weights = torch.count_nonzero(module.weight).item()
                 writer.add_scalar(f'Non-zero weights/coarse_{name}', non_zero_weights, i)
+
+        # for name, module in model_fine.named_modules():
+        #     if isinstance(module, (torch.nn.Linear)) and name not in excluded_layers:
+        #         non_zero_weights = torch.count_nonzero(module.weight).item()
+        #         writer.add_scalar(f'Non-zero weights/fine_{name}', non_zero_weights, i)
 
 
         if USE_CACHED_DATASET:
