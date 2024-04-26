@@ -526,10 +526,11 @@ def main():
     print("consolidating files")
     #start iter, cfg.experiment.train_iters
     # {postcoarse}{postfine}
-    #get_prune_type = lambda path: path.split('/')[2].split()[0] if len(path.split('/')) >= 3 else None
+    
     # P- PRUNE, CQ - COARSE QUANT, FQ - FINE QUANT
     exp_name = f"P{configargs.prune}-CQ{cfg.models.coarse.n_bits}-FQ{cfg.models.fine.n_bits}_{str(start_iter/1000)}-{str(cfg.experiment.train_iters/1000)}k"
-    new_folder_path = os.path.join(logdir, exp_name)
+    prev_ckpt = 'post'+str(configargs.load_checkpoint).split('\\')[2].split('P', 1)[1].split('-', 1)[0] if configargs.load_checkpoint is not None else ""
+    new_folder_path = os.path.join(logdir, exp_name + prev_ckpt)
     os.makedirs(new_folder_path, exist_ok=True)
 
     # Iterate through all items in the original folder
