@@ -10,6 +10,7 @@ import torchvision
 import yaml
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm, trange
+from pytorch_msssim import ssim
 
 from torch import nn
 import torch.nn.utils.prune as prune
@@ -17,7 +18,8 @@ import torch.nn.functional as F
 
 from nerf import (CfgNode, get_embedding_function, get_ray_bundle, img2mse,
                   load_blender_data, load_llff_data, meshgrid_xy, models,
-                  mse2psnr, run_one_iter_of_nerf, load_pruned_state_dict)
+                  mse2psnr, run_one_iter_of_nerf, load_pruned_state_dict, 
+                  calculate_ssim)
 
 def main():
 
@@ -353,22 +355,27 @@ def main():
             )
             target_ray_values = target_s
 
+        # print("Shape of target_ray_values:", target_ray_values.shape)
+        # # Printing tensor shapes
+        # print("Shape of rgb_coarse:", rgb_coarse[..., :3].shape)
+        # print("Shape of rgb_fine:", rgb_fine[..., :3].shape)
         coarse_loss = torch.nn.functional.mse_loss(
             rgb_coarse[..., :3], target_ray_values[..., :3]
         )
+        # print("Coarse loss:", coarse_loss.item())
+        # a = input('Enter to continue')
+
         fine_loss = None
         if rgb_fine is not None:
             fine_loss = torch.nn.functional.mse_loss(
                 rgb_fine[..., :3], target_ray_values[..., :3]
             )
-
+            #tot_ssim = calculate_ssim(rgb_fine[..., :3], target_ray_values[..., :3])
+        #else:
+            #tot_ssim = calculate_ssim(rgb_coarse[..., :3], target_ray_values[..., :3])
         #%% CALCULATE LOSS
-        # loss = torch.nn.functional.mse_loss(rgb_pred[..., :3], target_s[..., :3])
+
         loss = 0.0
-        # if fine_loss is not None:
-        #     loss = fine_loss
-        # else:
-        #     loss = coarse_loss
         loss = coarse_loss + (fine_loss if fine_loss is not None else 0.0)
         loss.backward()
         psnr = mse2psnr(loss.item())
@@ -404,6 +411,7 @@ def main():
             )
         writer.add_scalar("train/loss", loss.item(), i)
         writer.add_scalar("train/coarse_loss", coarse_loss.item(), i)
+        # writer.add_scalar("train/ssim", tot_ssim, i)
         if rgb_fine is not None:
             writer.add_scalar("train/fine_loss", fine_loss.item(), i)
         writer.add_scalar("train/psnr", psnr, i)
@@ -462,16 +470,23 @@ def main():
                     target_ray_values = img_target
                 coarse_loss = img2mse(rgb_coarse[..., :3], target_ray_values[..., :3])
                 loss, fine_loss = 0.0, 0.0
+                
                 if rgb_fine is not None:
                     fine_loss = img2mse(rgb_fine[..., :3], target_ray_values[..., :3])
                     loss = fine_loss
+                    # print("Shape of rgb_coarse:", rgb_coarse[..., :3].shape)
+                    # print("Shape of rgb_fine:", rgb_fine[..., :3].shape)
+                    # a = input('l')
+                    tot_ssim = calculate_ssim(rgb_fine[..., :3], target_ray_values[..., :3])      
                 else:
                     loss = coarse_loss
+                    tot_ssim = calculate_ssim(rgb_coarse[..., :3], target_ray_values[..., :3])
                 loss = coarse_loss + fine_loss
                 psnr = mse2psnr(loss.item())
                 writer.add_scalar("validation/loss", loss.item(), i)
                 writer.add_scalar("validation/coarse_loss", coarse_loss.item(), i)
                 writer.add_scalar("validation/psnr", psnr, i)
+                writer.add_scalar("validation/ssim", tot_ssim, i)
                 writer.add_image(
                     "validation/rgb_coarse", cast_to_image(rgb_coarse[..., :3]), i
                 )

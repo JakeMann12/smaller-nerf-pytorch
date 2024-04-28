@@ -1,6 +1,6 @@
 import math
 from typing import Optional
-
+import kornia
 import torch
 
 
@@ -318,6 +318,28 @@ def load_pruned_state_dict(model, state_dict):
         model.eval()  # Set model to evaluation mode after loading
     except:
         load_pruned_state_dict_weird(model, state_dict)
+
+
+def calculate_ssim(tensor1, tensor2): #FOR EVAL
+    def tensor_to_image(tensor):
+        # Assuming the tensor's size in terms of number of elements matches 3 * 400 * 400
+        return tensor.reshape(1, 3, 400, 400)
+
+    img1 = tensor_to_image(tensor1)
+    img2 = tensor_to_image(tensor2)
+
+    # Normalize the tensors to [0, 1] if they are not already
+    img1 = img1.float() / 255.0
+    img2 = img2.float() / 255.0
+
+    # Compute SSIM using the kornia.metrics.ssim function
+    window_size = 11
+    ssim_map = kornia.metrics.ssim(img1, img2, window_size, max_val=1.0, eps=1e-12, padding='same')
+
+    # Compute mean SSIM over all elements
+    mean_ssim = ssim_map.mean().item()
+
+    return mean_ssim
 
 
 # def load_pruned_state_dict(model, state_dict):
