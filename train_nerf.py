@@ -4,6 +4,7 @@ import os
 import shutil
 import time
 
+import re
 import numpy as np
 import torch
 import torchvision
@@ -108,6 +109,9 @@ def main():
     np.random.seed(seed)
     torch.manual_seed(seed)
 
+    # a = re.search(r'/P([^-\s]+)-', cfg.load_checkpoint).group(1) if cfg.load_checkpoint != "" else ""
+    # b = input(a)
+
     # Device on which to run.
     if torch.cuda.is_available():
         device = "cuda"
@@ -186,8 +190,10 @@ def main():
 
     if os.path.exists(configargs.load_checkpoint):
         checkpoint = torch.load(configargs.load_checkpoint)
+        checkpoint_path = str(configargs.load_checkpoint)
         print(f"Success loading {configargs.load_checkpoint}")
     else:
+        checkpoint_path = ""
         if configargs.load_checkpoint != "":
             print(f"{configargs.load_checkpoint} doesn't exist! Wrong path perhaps?")
         else:
@@ -207,9 +213,7 @@ def main():
         optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
     start_iter = checkpoint.get("iter", 0)
         
-
-    # # TODO: Prepare raybatch tensor if batching random rays
-    times_to_prune = 10; pruning_intervals = list(np.linspace(.0,.5,times_to_prune+1))
+    # times_to_prune = 10; pruning_intervals = list(np.linspace(.0,.5,times_to_prune+1))
     print(f"\n{times_to_prune}, \n{pruning_intervals}")
     
     #If we need to preserve pruning in future runs
@@ -544,7 +548,8 @@ def main():
     
     # P- PRUNE, CQ - COARSE QUANT, FQ - FINE QUANT
     exp_name = f"P{configargs.prune}-CQ{cfg.models.coarse.n_bits}-FQ{cfg.models.fine.n_bits}_{str(start_iter/1000)}-{str(cfg.experiment.train_iters/1000)}k"
-    prev_ckpt = 'post'+str(configargs.load_checkpoint).split('\\')[2].split('P', 1)[1].split('-', 1)[0] if configargs.load_checkpoint != "" else ""
+    matched_group = re.search(r'/P([^-\s]+)-', checkpoint_path)
+    prev_ckpt = 'post' + matched_group.group(1) if matched_group and configargs.load_checkpoint != "" else ""
     new_folder_path = os.path.join(logdir, exp_name + prev_ckpt)
     os.makedirs(new_folder_path, exist_ok=True)
 
@@ -557,7 +562,6 @@ def main():
             shutil.move(item_path, new_folder_path)
     print(f"Done! Folder {exp_name}")
 
-
 def cast_to_image(tensor):
     # Input tensor is (H, W, 3). Convert to (3, H, W).
     tensor = tensor.permute(2, 0, 1)
@@ -566,7 +570,6 @@ def cast_to_image(tensor):
     # Map back to shape (3, H, W), as tensorboard needs channels first.
     img = np.moveaxis(img, [-1], [0])
     return img
-
 
 if __name__ == "__main__":
     main()
