@@ -31,12 +31,12 @@ def cast_to_image(tensor, dataset_type):
     # # Map back to shape (3, H, W), as tensorboard needs channels first.
     # return np.moveaxis(img, [-1], [0])
 
-def create_gif(folder_path, frame_duration=200):
+def create_gif(folder_path, avgtime = "", frame_duration=200):
     # Makes gif from results pics, puts it in parent folder.
     file_paths = sorted([os.path.join(folder_path, file_name) for file_name in os.listdir(folder_path) if file_name.endswith('.png')])
     images = [Image.open(file_path) for file_path in file_paths]
     parent_folder = os.path.basename(os.path.dirname(folder_path))
-    output_filename = f"{parent_folder}.gif"
+    output_filename = f"{parent_folder}_{avgtime}secinf.gif"
     image_directory = os.path.dirname(folder_path)
     output_path = os.path.join(image_directory, output_filename)
     images[0].save(output_path, save_all=True, append_images=images[1:], optimize=False, duration=frame_duration, loop=0)
@@ -231,9 +231,9 @@ def main():
         imageio.imwrite(
             savefile, cast_to_image(rgb[..., :3], cfg.dataset.type.lower())
         )
-            
-        tqdm.write(f"Avg time per image: {sum(times_per_image) / (i + 1)}")
-    create_gif(os.path.join(configargs.logdir, "results"))
+        avgtimeinfer = str(round(sum(times_per_image) / (i + 1), 2))
+        tqdm.write(f"Avg time per image: {avgtimeinfer}")
+    create_gif(os.path.join(configargs.logdir, "results"), avgtime = avgtimeinfer)
 
 
 if __name__ == "__main__":
